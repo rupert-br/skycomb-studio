@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.cache/
+__pycache__/
+.venv/
+
+# secrets
+.env
+.env.local
+.env.*.local

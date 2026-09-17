@@ -1,0 +1,220 @@
+@import "tailwindcss";
+
+/* Ridgeline Studio's chrome (floating panels, controls) follows the Google Maps /
+   Material idiom: light surfaces, elevation shadows instead of borders, Google Blue
+   for the one accent. The map fills the whole viewport underneath, so this is a real
+   theme, not a toggle. The poster itself stays black regardless — see .poster below,
+   it's the printed product, not part of the app chrome. */
+:root {
+  --radius: 0.75rem;
+
+  --background: #f1f3f4;
+  --foreground: #202124;
+
+  --card: #ffffff;
+  --card-foreground: #202124;
+  --popover: #ffffff;
+  --popover-foreground: #202124;
+
+  --primary: #1a73e8;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f1f3f4;
+  --secondary-foreground: #202124;
+
+  --muted: #f1f3f4;
+  --muted-foreground: #5f6368;
+
+  --accent: #e8f0fe;
+  --accent-foreground: #1a73e8;
+
+  --destructive: #d93025;
+  --destructive-foreground: #ffffff;
+
+  --border: #dadce0;
+  --input: #dadce0;
+  --ring: #1a73e8;
+
+  /* Google Blue — the app's one accent color, same token name ("brand") carried over
+     from before so components didn't need renaming, just a new value. */
+  --brand: #1a73e8;
+  --brand-foreground: #ffffff;
+
+  /* Material elevation: layered, soft, cool-tinted shadows instead of a single hard
+     drop shadow — this is most of what makes floating panels read as "Google Maps". */
+  --elevation-1: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --elevation-2: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+
+  --shadow-elevation-1: var(--elevation-1);
+  --shadow-elevation-2: var(--elevation-2);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Google's own UI font, for the app chrome */
+  --font-sans: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* One quiet serif moment for the poster title — the single thing on screen that's
+     actually the "content," everything else stays on the plain utilitarian grotesk. */
+  --font-display: "Fraunces", "Helvetica Neue", serif;
+  /* Numeric readouts only (coordinates, zoom/tile/timing stats) — a monospace tells the
+     eye "this is data" without needing any color or weight to say so. */
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    margin: 0;
+  }
+}
+
+/* Mapbox's own CSS (mapbox-gl.css) sets `.mapboxgl-map { position: relative }` as a plain,
+   unlayered rule. Per the CSS cascade-layers spec, ANY unlayered rule beats ANY rule inside
+   an @layer — including Tailwind utilities and our own @layer components below — regardless
+   of specificity. So this override must stay outside every @layer, or the map container
+   collapses to 0 height (inset-0 with position:relative has nothing to size itself against). */
+.map-wrap .mapboxgl-map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Restyle Mapbox's own zoom/compass control to read as a Material elevated card
+   (soft layered shadow, no hard border) instead of its default flat 2px ring —
+   same reasoning as the cascade-layer note above: stay outside every @layer so this
+   isn't beaten by mapbox-gl.css's own unlayered rules. */
+.mapboxgl-ctrl-group {
+  border-radius: 8px !important;
+  box-shadow: var(--elevation-1) !important;
+  overflow: hidden;
+}
+
+/* Shared by the minimized tab and the expanded Card (App.tsx, both tagged
+   .ridgeline-panel-morph) — since only one of the two is ever in the DOM at a time, the
+   View Transitions API treats toggling between them as that one named element changing,
+   and morphs its captured position/size/radius from the old snapshot to the new one
+   instead of the instant swap React's conditional render would otherwise produce. */
+.ridgeline-panel-morph {
+  view-transition-name: ridgeline-panel;
+}
+::view-transition-group(ridgeline-panel) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Bespoke pieces with no direct Tailwind/shadcn equivalent */
+@layer components {
+  /* Full-viewport map with a fixed selection frame; everything outside it is dimmed.
+     Floating panels (nav, result popup) sit in a higher stacking layer, see App.tsx. */
+  .map-wrap {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .frame-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 500;
+    pointer-events: none;
+    display: grid;
+    place-items: center;
+    container-type: size;
+  }
+  .frame {
+    width: min(86cqw, calc(86cqh * var(--aspect)));
+    aspect-ratio: var(--aspect);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 0 100vmax rgba(6, 7, 10, 0.55);
+  }
+
+  .poster {
+    position: relative;
+    min-height: 180px;
+    padding: 20px 16px 16px;
+    background: #000;
+    /* From sm upward the card around this gives it a real height (top-4..bottom-4); grow
+       into it and derive width from that height in the poster's own A4 ratio, so the chart
+       fills the window instead of sitting in a small fixed-size thumbnail. sm:self-center
+       opts out of CardContent's default align-items:stretch — without it the flex column
+       stretches this item to the card's full cross-axis width instead of letting
+       aspect-ratio derive width from the flex-grown height, which also fed a resize-observer
+       feedback loop (each redraw's SVG width nudged the stretched width further off-ratio). */
+    @apply rounded flex flex-col items-center justify-center sm:min-h-0 sm:w-auto sm:flex-1 sm:self-center sm:aspect-[0.70711];
+  }
+  .ridgeline-chart {
+    @apply w-full sm:h-full;
+  }
+  /* draw() (RidgelineChart.tsx) always renders somewhat taller than the `plotHeight` it's
+     given — label margin plus the relief lines' overshoot above the top row — so once
+     .poster has a real fixed height (sm and up) the chart can end up a bit taller than the
+     box we measured it for. max-height here (needs .ridgeline-chart to have a resolvable
+     height, hence sm:h-full) keeps it contained without ever distorting the aspect ratio. */
+  .ridgeline-chart svg {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    margin: 0 auto;
+  }
+  .poster-loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.6);
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    @apply rounded;
+  }
+  /* Unlike .poster (always black — it's the printed product), this caption sits directly
+     on the white Material card, so it takes the card's own text color, not a fixed white. */
+  .poster-caption input {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--card-foreground);
+    text-align: center;
+    font: 400 19px/1.3 var(--font-display), "Helvetica Neue", serif;
+    letter-spacing: 0.01em;
+  }
+  .poster-caption input:focus {
+    outline: none;
+    box-shadow: 0 1px 0 0 var(--border);
+  }
+}
