@@ -1,0 +1,12 @@
+node_modules
+.nuxt
+.output
+.cache
+.git
+.env
+.env.*
+!.env.example
+.claude
+__pycache__
+# Committed sample tiles; the app fetches/caches its own at runtime (.cache/tiles)
+tiles
