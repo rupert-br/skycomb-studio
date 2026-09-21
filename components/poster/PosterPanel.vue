@@ -271,6 +271,7 @@ async function openBuy() {
         >
           {{ loading ? 'Rendering…' : 'Render this area' }}
         </Button>
+        <!-- Download is hidden until user management is in place.
         <div class="inline-flex">
           <Button
             :disabled="!result"
@@ -350,6 +351,7 @@ async function openBuy() {
             </PopoverContent>
           </Popover>
         </div>
+        -->
       </div>
       <!--
       <Button

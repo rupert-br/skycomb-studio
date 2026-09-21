@@ -13,3 +13,4 @@ __pycache__/
 .env.*.local
 !.env.example
 !.env.local.example
+tiles/
