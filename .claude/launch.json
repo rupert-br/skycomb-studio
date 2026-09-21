@@ -2,28 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "ridgelines",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "/Users/rupertbrandstatter/projects/mountains-austria"],
-      "port": 8765
-    },
-    {
-      "name": "api",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "uvicorn", "main:app", "--app-dir", "/Users/rupertbrandstatter/projects/mountains-austria/app/backend", "--port", "8010"],
-      "port": 8010
-    },
-    {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/rupertbrandstatter/projects/mountains-austria/app/frontend", "run", "dev", "--", "--strictPort"],
-      "port": 5173
+      "runtimeArgs": ["--prefix", "/Users/rupertbrandstatter/projects/mountains-austria/app", "run", "dev"],
+      "port": 3001,
+      "autoPort": true
     },
     {
-      "name": "web-session",
+      "name": "skycomb",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/rupertbrandstatter/projects/mountains-austria/app/frontend", "run", "dev", "--", "--port", "5174", "--strictPort"],
-      "port": 5174
+      "runtimeArgs": ["--prefix", "/Users/rupertbrandstatter/projects/skycomb-studio/app", "run", "dev"],
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }

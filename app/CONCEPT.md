@@ -1,13 +1,18 @@
-# Ridgeline Studio — concept
+# Skycomb Studio — concept
 
-Turn any mountain area on a map into an "Unknown Pleasures"-style ridgeline poster: frame an area, the backend samples its terrain into stacked elevation profiles, the browser draws and styles them, and the result can be exported for print.
+Turn any mountain area on a map into an "Unknown Pleasures"-style ridgeline poster: frame an area, the server samples its terrain into stacked elevation profiles, the browser draws and styles them, and the result can be exported for print.
 
-This folder contains a working prototype of the concept:
+This folder is a single Nuxt 4 application — Vue 3 + TypeScript on the client, Nitro (Nuxt's own server engine) on the server. There is no separate backend service: the elevation-tile fetching, terrain math and OSM lookups that used to live in a Python/FastAPI service now run as Nitro server routes in the same codebase, same language, same deploy.
 
 ```
 app/
-├── backend/     FastAPI · elevation tiles → ridgeline profiles, OSM summit names
-└── frontend/    Vue 3 + TypeScript + Vite · Mapbox GL globe framing, live poster preview, JPG export
+├── pages/            index.vue (landing, SSR) · about.vue (SSR) · studio/index.vue (the tool, client-rendered)
+├── components/       map/MapFrame.vue · search/MountainPicker.vue · poster/{PosterPanel,RidgelineChart,BuyPanel}.vue · ui/ (shadcn-vue)
+├── composables/      useRidgelineRender · usePosterTitle · usePosterCard · useChartSize · useRidgelineApi · useCart
+├── data/             mountains.ts (predefined peaks) · products.ts (buy-flow catalog) · heroRidgeline.ts (landing hero, baked real terrain)
+├── server/api/       ridgelines.get.ts · summits.get.ts · search-peaks.get.ts · health.get.ts
+├── server/utils/     dem.ts (terrain math) · peaks.ts (Overpass/Nominatim) · sharedCache.ts · terrarium.ts (PNG decode)
+└── types/            ridgeline.ts — shared, byte-for-byte, between the client and the server
 ```
 
 ## User flow
@@ -15,20 +20,20 @@ app/
 1. **Frame** — the map opens as a 3D globe on Mapbox's **Standard** style (`projection: "globe"`, night light preset — the dark, hillshaded "outdoors" look) with real terrain displacement; pan/zoom/rotate to find an area, then a fixed 5:4 frame marks the poster area (presets fly there directly). Camera pitch is locked to 0 so the frame always maps to a true rectangle on the ground; the terrain's 3D relief still reads clearly away from the globe's center, purely from the sphere's own curvature. At the zoom levels used to frame a mountain range the curvature is imperceptible, so framing feels like a flat map even though the projection never switches.
 2. **Render** — the frame goes to two endpoints in parallel: ridgelines (drawn as soon as they arrive) and summit names (labels appear when the slower OpenStreetMap lookup finishes).
 3. **Tune** — viewing direction and line count re-query ridgelines only (the elevation grid is cached, so this takes milliseconds); relief, labels and title are pure client-side re-styling.
-4. **Export** — download a poster JPEG (chart + title block, built as SVG then rasterized client-side at 3x for print). Print/order flows are on the roadmap.
+4. **Export** — download a poster JPEG (chart + title block, built as SVG then rasterized client-side at 3x for print), or open "Buy prints & merch" for a mocked-up product picker (poster/t-shirt/hoodie/tote/mug, with the rendered poster composited onto each) and a session cart. This is a UI-only preview of the shopping flow — no payment or fulfilment provider is wired up yet (see the v2 roadmap below).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph Browser["Vue 3 + TypeScript app"]
-    Map["MapFrame<br/>Mapbox GL (Standard style, globe + terrain) + fixed frame → bbox"]
-    State["App state<br/>bbox · direction · lines"]
-    Chart["RidgelineChart<br/>Observable Plot · relief · labels · JPG export"]
+  subgraph Browser["Nuxt app — /studio (client-rendered)"]
+    Map["MapFrame.vue<br/>Mapbox GL (Standard style, globe + terrain) + fixed frame → bbox"]
+    State["useRidgelineRender<br/>bbox · direction · lines"]
+    Chart["RidgelineChart.vue<br/>Observable Plot · relief · labels · JPG export"]
     Map --> State
   end
-  State -->|"GET /api/ridgelines"| Lines["profiles<br/>(dem.py)"]
-  State -->|"GET /api/summits"| Names["summit lookup<br/>(peaks.py)"]
+  State -->|"GET /api/ridgelines"| Lines["profiles<br/>(server/utils/dem.ts)"]
+  State -->|"GET /api/summits"| Names["summit lookup<br/>(server/utils/peaks.ts)"]
   Lines --> Grid{"grid cache<br/>per rounded bbox"}
   Names --> Grid
   Names --> NameCache{"summit cache<br/>per rounded bbox"}
@@ -39,7 +44,9 @@ flowchart LR
   Names -->|"names + positions"| Chart
 ```
 
-**Split of work.** The server does everything that needs raw elevation data: tile I/O, NumPy aggregation, and placing summits on the DEM. The client gets a compact matrix (`lines × samples` integers, ~150 KB gzipped at 100 × 360) and owns all visual decisions, so styling never costs a round trip.
+**`/` and `/about` are server-rendered** (Nuxt's default); **`/studio` is not** — `routeRules` in `nuxt.config.ts` opts it out of SSR because it's a full-viewport interactive map + live chart with nothing to gain from server rendering, and because Mapbox GL touches `window` at import time (loaded dynamically, client-only, for exactly that reason).
+
+**Split of work.** The server does everything that needs raw elevation data: tile I/O, terrain-grid math, and placing summits on the DEM. The client gets a compact matrix (`lines × samples` integers, ~150 KB gzipped at 100 × 360) and owns all visual decisions, so styling never costs a round trip.
 
 **Why two endpoints.** Measured while building the prototype: ridgelines for a cached area take 7–100 ms, while the public Overpass API took 0.5–8 s for the same small query, at times answered HTTP 504 (overloaded), and a public mirror didn't answer within 30 s. Coupling them would make every render as slow as the slowest dependency; separating them keeps the core experience fast and lets labels fail gracefully.
 
@@ -78,14 +85,14 @@ Same frame parameters. Returns the highest named OSM peaks, spread apart so labe
 
 Errors (both endpoints): `422` invalid, too large or too small area; `502` elevation tiles unreachable.
 
-## Processing pipeline (`dem.py`)
+## Processing pipeline (`server/utils/dem.ts`)
 
 1. **Zoom selection** — highest zoom (≤ 13, ~12 m/px) whose tile count fits a 64-tile budget; large frames automatically use coarser data.
-2. **Mosaic + crop** — fetch Terrarium PNG tiles in parallel (disk + in-memory LRU cache), decode `R·256 + G + B/256 − 32768`, crop to the frame.
+2. **Mosaic + crop** — fetch Terrarium PNG tiles in parallel (disk cache via plain `node:fs`, in-memory LRU via `SharedCache`), decode `R·256 + G + B/256 − 32768` with a pure-JS PNG decoder (`pngjs` — no native deps, so the server isn't tied to a Node runtime that can run `sharp`), crop to the frame.
 3. **Despike** — clamp single-pixel outliers (> 200 m beyond all 8 neighbours); the public tiles contain occasional bogus values (a 5,005 m pixel appeared near Kufstein).
-4. **Cache the grid** per rounded bbox. Concurrent requests for the same frame share one computation (`cache.SharedCache`), so a fast direction switch while the first render is still running doesn't download tiles twice.
+4. **Cache the grid** per rounded bbox. Concurrent requests for the same frame share one computation (`SharedCache`, a small LRU that also coalesces in-flight requests behind a single Promise), so a fast direction switch while the first render is still running doesn't download tiles twice.
 5. **Orient** — rotate/flip the grid so row 0 is the far edge for the chosen direction.
-6. **Profiles** — split into `lines` bands; per band take column-bin maxima (keeps sharp summits) and average over the band's pixel rows (smooths noise). Vectorised with `np.maximum.reduceat`.
+6. **Profiles** — split into `lines` bands; per band take column-bin maxima (keeps sharp summits) and average over the band's pixel rows (smooths noise), with plain `Float32Array` loops instead of NumPy — the ≤64-tile budget keeps this cheap even unvectorised, and results are cached the same way.
 
 ## Rendering (`RidgelineChart.vue`)
 
@@ -98,14 +105,55 @@ Errors (both endpoints): `422` invalid, too large or too small area; `502` eleva
 
 | Concern | Prototype | Production |
 |---|---|---|
-| Tile cache | local disk + LRU | object storage (S3/R2) in the same region as the API |
-| Grid / summit caches | in memory per process, request coalescing | Redis or object storage shared by all instances; CDN in front of the cacheable GETs |
-| Compute | a never-seen area needs its tile downloads (a few seconds); cached areas answer in milliseconds | stateless containers, autoscaled; cold cost is mostly tile fetches (≤ 64 × ~100 KB) and ~20 MB RAM per grid |
+| Tile cache | local disk + LRU | swap the disk driver for Nitro's `unstorage` (Redis/S3/R2/Cloudflare KV — pluggable, no code change) in the same region as the app |
+| Grid / summit caches | in memory per process, request coalescing (`SharedCache`) | same `SharedCache` shape, backed by a shared store instead of process memory; CDN in front of the cacheable GETs |
+| Compute | a never-seen area needs its tile downloads (a few seconds); cached areas answer in milliseconds | stateless Nitro instances, autoscaled (Node server, Docker, or a serverless Nitro preset); cold cost is mostly tile fetches (≤ 64 × ~100 KB) and ~20 MB RAM per grid |
 | Summits | public Overpass instance (slow, occasionally HTTP 504) | pre-extracted peak table from an OSM planet/regional extract (PostGIS), queried in milliseconds |
 | Base map | OSM standard tiles | commercial tile provider (the OSM tile policy forbids heavy use) |
 | Abuse | span limits | rate limiting per IP/account, request timeouts |
 
 Heavier artefacts (print PDFs, plotter files) should be generated asynchronously: `POST /api/exports` → job queue → file in object storage → download link.
+
+## Accounts (concept — not implemented)
+
+`/signup` today is a UI-only mock: the fields live in the page's own `ref()`s, submit just sleeps 600 ms and flips to a success state, and nothing is sent to the server — a reload loses it, same spirit as `BuyPanel`'s checkout preview. This is the design for when it becomes real.
+
+**Shape: Nitro as a BFF over a private account service.** The Nuxt server stays the only thing the browser ever talks to (a backend-for-frontend); user records live in **PocketBase**, a single off-the-shelf Go binary with SQLite, built-in signup/login, password hashing and an admin UI. PocketBase is not custom code — it's a stateful dependency, like Postgres would be — and it is never exposed to the internet.
+
+```mermaid
+flowchart LR
+  Browser["Browser<br/>signup.vue · /studio"]
+  subgraph App["Nuxt app — stateless, autoscaled"]
+    Auth["server/api/auth/*<br/>signup · login · logout · me<br/>(the BFF)"]
+    Session["sealed httpOnly cookie<br/>(nuxt-auth-utils)"]
+    Auth --- Session
+  end
+  PB[("PocketBase<br/>private network only<br/>users collection + SQLite file<br/>persistent volume")]
+  Browser -->|"same-origin /api/auth/*<br/>cookie only, no tokens in JS"| Auth
+  Auth -->|"server-to-server HTTP"| PB
+```
+
+**Why this shape:**
+- **The browser never sees PocketBase.** No PocketBase URL, SDK or token in client code; CORS and PocketBase's own public API rules stay closed. The BFF is also the place for rate limiting, `zod` validation (already used server-side for `ridgelines`/`search-peaks`) and any later fan-out to other services (print-on-demand, payments).
+- **Nitro stays stateless.** All state lives in the one dedicated service, so the app can still autoscale as this doc's scaling table assumes — which a SQLite file inside the app instances could not. The earlier "plain SQLite doesn't survive multiple instances" problem disappears because SQLite is now owned by exactly one process.
+- **Almost no auth code to write.** PocketBase creates users, enforces unique emails and hashes passwords; the BFF is thin glue.
+
+**Flow:**
+1. `POST /api/auth/signup` — validate the body with `zod`, call PocketBase's `users` collection create endpoint, then authenticate with password to get PocketBase's token. A taken email comes back as a validation error and surfaces in `signup.vue` as a form error.
+2. Store the user id (and PocketBase token, for later calls made on the user's behalf) in a sealed, httpOnly session cookie via `nuxt-auth-utils`; the token never reaches client JS.
+3. `signup.vue` posts to the route instead of running its local mock; the existing "Passwords don't match" client check stays.
+4. `POST /api/auth/login`, `POST /api/auth/logout` and `GET /api/auth/me` complete the set; gate any future "saved designs" feature in `/studio` behind the session with `requireUserSession()`.
+
+**PocketBase setup notes:**
+- Reachable only from the Nuxt app (private network / same host, e.g. `NUXT_POCKETBASE_URL=http://pocketbase:8090` as server-only `runtimeConfig`, same pattern as `overpassUrl`); collection API rules locked down so nothing works without the BFF's credentials.
+- Its `pb_data/` directory (SQLite + uploads) sits on a persistent volume, gitignored locally like `.cache/`, with scheduled backups (PocketBase has built-in backup support; Litestream is the usual continuous alternative).
+
+**Trade-offs, honestly:**
+- Two deployables again (Nuxt + PocketBase), which is the cost the earlier single-app migration removed. What's different: the second one is an unmodified binary that owns state, not a second codebase of backend logic.
+- PocketBase is single-node — vertical scaling only and a single point of failure for signup/login. Fine at this scale; if it stops being fine, the BFF boundary means swapping to hosted Postgres or an auth provider only touches `server/api/auth/*`, not the browser code.
+- Auth logic (sessions, password policy) is split between BFF and PocketBase; keep the rule simple — PocketBase owns identity and passwords, the BFF owns the browser session.
+
+**Deliberately out of scope for v1:** email verification, password reset, OAuth — PocketBase supports all three, so they're cheap to add later.
 
 ## Data and licensing
 
@@ -126,23 +174,19 @@ Heavier artefacts (print PDFs, plotter files) should be generated asynchronously
 - Custom text: title, subtitle, date, coordinates
 
 **v2 — commerce & materials**
-- Checkout + print-on-demand fulfilment API
+- A product picker with mocked-up previews and a session cart exists (`BuyPanel.vue`); still needed: real checkout + print-on-demand fulfilment API behind it
 - Accounts and saved designs
 - **Plotter/laser export:** fills don't exist on a pen plotter, so hidden segments must be removed geometrically (clip each line against the union of nearer ridges, e.g. with Shapely) and paths optimised for travel
 - B2B: bulk/branded editions for huts, tourism regions and races
 
-## Running the prototype
+## Running the app
 
 ```bash
-# backend (Python 3.11+)
-pip install -r app/backend/requirements.txt
-uvicorn main:app --app-dir app/backend --port 8000
-
-# frontend (Node 20+), proxies /api to :8000
-npm --prefix app/frontend install
-cp app/frontend/.env.local.example app/frontend/.env.local  # then paste in a Mapbox token
-npm --prefix app/frontend run type-check  # vue-tsc, no emit
-npm --prefix app/frontend run dev         # → http://localhost:5173
+# Node 20+, one app (client + server)
+npm --prefix app install
+cp app/.env.example app/.env   # then paste in a Mapbox token
+npm --prefix app run typecheck # nuxt typecheck (vue-tsc), no emit
+npm --prefix app run dev       # → http://localhost:3000
 ```
 
 ## Known limitations
@@ -152,5 +196,5 @@ npm --prefix app/frontend run dev         # → http://localhost:5173
 - The first render of a never-seen area waits for tile downloads; repeated or nearby frames hit the caches.
 - Caches live in one process, so they are lost on restart and not shared between workers.
 - Very flat areas produce near-flat lines (relief is normalised to the frame's own elevation range).
-- The map needs a Mapbox access token (`VITE_MAPBOX_TOKEN` in `app/frontend/.env.local`, gitignored — see `.env.local.example`) or it fails to load; a public (`pk.`) token is meant to be shipped in client code, but should still be scoped to your own domains in Mapbox's dashboard before going live.
+- The map needs a Mapbox access token (`NUXT_PUBLIC_MAPBOX_TOKEN` in `app/.env`, gitignored — see `.env.example`) or it fails to load; a public (`pk.`) token is meant to be shipped in client code, but should still be scoped to your own domains in Mapbox's dashboard before going live.
 - Mapbox GL JS is source-available under Mapbox's own license (not open-source) and its usage counts against your Mapbox account's map-load quota — check pricing before high traffic.
