@@ -1,32 +1,26 @@
 <script setup lang="ts">
 // Landing page — SSR'd (unlike /studio). The hero's ridgeline art is synthetic (HeroRidgeline.vue
 // generates it from fixed math, not a real frame) so this page never needs Mapbox or the terrain
-// pipeline just to look like the product.
+// pipeline just to look like the studio.
 import {
   ArrowRight,
   Compass,
-  Coffee,
-  Download,
-  Frame,
+  Database,
   Globe,
   Layers,
   MapPin,
   Palette,
   Plus,
   Rows3,
-  ShoppingBag,
-  Shirt,
   SlidersHorizontal,
 } from '@lucide/vue'
 import { COUNTRIES, countryFlag, peaksGeoJSON } from '~/data/mountains'
-import { CURRENCY, PRODUCTS } from '~/data/products'
-import type { ProductId } from '~/data/products'
 
 useHead({ title: 'Skycomb Studio' })
 useSeoMeta({
-  title: 'Skycomb Studio: turn any mountain into a poster',
+  title: 'Skycomb Studio: turn any mountain into ridgelines',
   description:
-    "Frame any mountain range on a map, or start from a summit that's already loaded, and turn its terrain into an Unknown Pleasures style ridgeline print. Then put it on a poster, a tee, or a mug.",
+    "Frame any mountain range on a map, or start from a summit that's already loaded, and turn its terrain into an Unknown Pleasures style ridgeline drawing.",
 })
 
 const peakCount = peaksGeoJSON().features.length
@@ -47,11 +41,6 @@ const STEPS = [
     icon: SlidersHorizontal,
     title: 'Tune',
     text: 'Viewing direction, line count, relief and summit labels are all instant client-side restyling, so nothing re-renders the terrain.',
-  },
-  {
-    icon: ShoppingBag,
-    title: 'Export & buy',
-    text: 'Download a print-ready JPG, or carry the same artwork straight onto a poster, tee, hoodie, tote or mug.',
   },
 ]
 
@@ -90,15 +79,15 @@ const FEATURES = [
     text: 'Five color schemes, adjustable relief, your own title. Changes apply instantly, without re-fetching any terrain.',
   },
   {
-    icon: Download,
-    title: 'Print-ready export',
-    text: 'Download the poster as a high-resolution JPG, title block included, rendered at three times screen size.',
+    icon: Database,
+    title: 'Built on open data',
+    text: 'Elevation comes from AWS Terrain Tiles and summit names from OpenStreetMap, both open datasets available to everyone.',
   },
 ]
 
 const FAQ = [
   {
-    q: 'Where in the world can I make a poster?',
+    q: 'Where in the world can I use it?',
     a: 'Anywhere with a mountain to draw. Elevation data covers the whole globe, and a single frame can span roughly 150 km at Alpine latitudes, enough for a whole massif.',
   },
   {
@@ -110,30 +99,18 @@ const FAQ = [
     a: 'No. The studio opens straight away, no sign-up needed. Accounts are planned so you can save your designs.',
   },
   {
-    q: 'Can I already order a poster or a T-shirt?',
-    a: "Not yet. Today you can download your design as a JPG and preview it on a poster, tee, hoodie, tote or mug. Checkout and printing aren't connected yet.",
-  },
-  {
     q: 'How long does a render take?',
     a: 'A few seconds for an area the studio has not seen before, while the terrain tiles load. After that, changing direction, line count or relief is nearly instant.',
   },
 ]
-
-const PRODUCT_ICONS: Record<ProductId, typeof Frame> = {
-  poster: Frame,
-  tshirt: Shirt,
-  hoodie: Shirt,
-  totebag: ShoppingBag,
-  mug: Coffee,
-}
 </script>
 
 <template>
   <main class="bg-background text-foreground">
     <SiteHeader />
 
-    <!-- Hero: the one full-bleed black moment on the page — the poster itself is black with
-         white ridgelines (see .poster in main.css), so the hero borrows that exact palette
+    <!-- Hero: the one full-bleed black moment on the page — the studio's default artwork is black
+         with white ridgelines (see .poster in main.css), so the hero borrows that exact palette
          instead of introducing a second visual language just for marketing. -->
     <section
       class="relative -mt-[68px] flex min-h-[92vh] items-end overflow-hidden bg-black pt-[68px] text-white sm:min-h-[86vh]"
@@ -159,7 +136,7 @@ const PRODUCT_ICONS: Record<ProductId, typeof Frame> = {
         <p class="max-w-xl text-balance text-sm text-white/70 sm:text-base">
           Frame a range on the map, or start from a summit that's already
           loaded, and watch its terrain rise into an Unknown&nbsp;Pleasures
-          style print. Tune it, then put it on a poster, a tee, or a mug.
+          style drawing. Tune it until it looks just right.
         </p>
         <div class="flex flex-wrap items-center gap-4 pt-2">
           <Button as-child variant="default">
@@ -182,11 +159,11 @@ const PRODUCT_ICONS: Record<ProductId, typeof Frame> = {
     <section id="how-it-works" class="mx-auto max-w-6xl px-6 py-20 sm:py-28">
       <div class="mb-10 max-w-xl sm:mb-14">
         <h2 class="font-display text-3xl tracking-tight sm:text-4xl">
-          From a frame on a map to something you can hang on a wall.
+          From a frame on a map to a drawing made of lines.
         </h2>
       </div>
 
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid gap-4 sm:grid-cols-3">
         <Card v-for="(step, i) in STEPS" :key="step.title" class="gap-4 p-5">
           <div class="flex items-center gap-3">
             <div
@@ -224,10 +201,10 @@ const PRODUCT_ICONS: Record<ProductId, typeof Frame> = {
       </div>
     </section>
 
-    <!-- Poster showcase: the product itself, in the studio's own color schemes -->
+    <!-- Color showcase: the artwork itself, in the studio's own color schemes -->
     <section class="bg-card/60 py-20 sm:py-28">
       <div class="mx-auto max-w-6xl px-6">
-        <PosterShowcase />
+        <ColorShowcase />
       </div>
     </section>
 
@@ -335,58 +312,6 @@ const PRODUCT_ICONS: Record<ProductId, typeof Frame> = {
         </Button>
       </div>
     </section>
-
-    <!-- Bring it home -->
-    <!-- <section class="bg-card/60 py-20 sm:py-28">
-      <div class="mx-auto max-w-6xl px-6">
-        <div
-          class="mb-10 flex flex-col items-start justify-between gap-4 sm:mb-14 sm:flex-row sm:items-end"
-        >
-          <div class="max-w-xl">
-            <h2 class="font-display text-3xl tracking-tight sm:text-4xl">
-              Prints and merch, mocked up from your own render.
-            </h2>
-          </div>
-          <Button as-child variant="outline">
-            <NuxtLink to="/studio" class="gap-1.5">
-              Try it on a product
-              <ArrowRight :size="14" />
-            </NuxtLink>
-          </Button>
-        </div>
-
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <Card
-            v-for="p in PRODUCTS"
-            :key="p.id"
-            class="items-center gap-3 p-5 text-center"
-          >
-            <div
-              class="flex size-11 items-center justify-center rounded-full bg-accent text-accent-foreground"
-            >
-              <component :is="PRODUCT_ICONS[p.id]" :size="18" />
-            </div>
-            <div>
-              <h3
-                class="font-display text-base tracking-tight text-card-foreground"
-              >
-                {{ p.name }}
-              </h3>
-              <p class="mt-0.5 text-xs text-muted-foreground">
-                {{ p.tagline }}
-              </p>
-            </div>
-            <p class="mt-auto text-sm font-medium text-card-foreground">
-              From {{ CURRENCY }}{{ p.priceFrom }}
-            </p>
-          </Card>
-        </div>
-        <p class="mt-6 text-xs text-muted-foreground">
-          A live preview of the shopping flow. Checkout and fulfilment are on
-          the roadmap, not wired up yet.
-        </p>
-      </div>
-    </section> -->
 
     <SiteFooter />
   </main>

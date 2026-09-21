@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The poster tool. Port of app/frontend/src/App.tsx — thinned out considerably since the
+// The studio tool. Port of app/frontend/src/App.tsx — thinned out considerably since the
 // render pipeline (useRidgelineRender), the title/subtitle logic (usePosterTitle) and the
 // collapse animation (usePosterCard) all moved into composables, and the card markup moved
 // into PosterPanel.vue.

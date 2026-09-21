@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Port of the Card markup in App.tsx (direction/lines/relief/labels controls, the poster
+// Port of the Card markup in App.tsx (direction/lines/relief/labels controls, the chart
 // itself, and the download menu) — split out into its own component so the page doesn't
 // carry 500+ lines of JSX-equivalent template. Owns purely presentational state: chart
 // sizing, the download-format menu, and the RidgelineChart's imperative handle.
@@ -9,7 +9,6 @@ import {
   ArrowRight,
   ArrowUp,
   ChevronLeft,
-  ShoppingBag,
 } from '@lucide/vue'
 import type { ExportFormat } from '~/components/poster/RidgelineChart.vue'
 import { MAX_LAT_SPAN, MAX_LON_SPAN } from '~/lib/constants'
@@ -62,33 +61,21 @@ const FORMATS: ExportFormat[] = ['jpg', 'png', 'svg']
 function download(format: ExportFormat) {
   chartEl.value?.download(title.value, props.subtitle, format)
 }
-
-const { count: cartCount } = useCart()
-const buyOpen = ref(false)
-const posterImage = ref<string | null>(null)
-
-// Re-snapshots the poster (title included) each time the buy panel opens, so an edited
-// title/subtitle since the last render shows up on the product mockups.
-async function openBuy() {
-  buyOpen.value = true
-  posterImage.value =
-    (await chartEl.value?.getPosterImage(title.value, props.subtitle)) ?? null
-}
 </script>
 
 <template>
   <button
     v-if="collapsed"
     type="button"
-    aria-label="Show ridgeline poster panel"
+    aria-label="Show ridgeline panel"
     class="ridgeline-panel-morph z-[600] flex w-fit items-center justify-center gap-1.5 self-start rounded-xl bg-card text-xs font-medium tracking-wide text-foreground shadow-elevation-2 hover:bg-muted max-sm:mx-4 max-sm:mb-4 max-sm:h-10 max-sm:px-4 sm:absolute sm:top-1/2 sm:right-4 sm:h-fit sm:-translate-y-1/2 sm:flex-col sm:gap-2 sm:px-2 sm:py-3"
     @click="emit('update:collapsed', false)"
   >
     <ChevronLeft :size="14" class="max-sm:hidden" />
     <span class="max-sm:hidden [writing-mode:vertical-rl] rotate-180"
-      >Ridgeline poster</span
+      >Ridgeline</span
     >
-    <span class="sm:hidden">Show ridgeline poster</span>
+    <span class="sm:hidden">Show ridgeline</span>
   </button>
 
   <Card
@@ -99,7 +86,7 @@ async function openBuy() {
       <div class="flex justify-end">
         <Button
           type="button"
-          aria-label="Minimize ridgeline poster panel"
+          aria-label="Minimize ridgeline panel"
           class="flex shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           @click="emit('update:collapsed', true)"
         >
@@ -141,14 +128,14 @@ async function openBuy() {
         class="poster-caption text-center"
         :class="{ 'opacity-50': !showText }"
       >
-        <input v-model="title" placeholder="Title" aria-label="Poster title" />
+        <input v-model="title" placeholder="Title" aria-label="Title" />
         <p
           class="mt-1.5 font-mono text-[10px] tracking-[0.2em] text-muted-foreground"
         >
           {{ subtitle }}
         </p>
         <p v-if="!showText" class="mt-1 text-[10px] text-muted-foreground">
-          Hidden on the downloaded poster
+          Hidden in the exported image
         </p>
       </div>
 
@@ -252,7 +239,7 @@ async function openBuy() {
         <div class="flex flex-wrap items-center gap-2">
           <Switch id="show-text" v-model="showText" />
           <Label for="show-text" class="cursor-pointer"
-            >Title &amp; subtitle on poster</Label
+            >Title &amp; subtitle</Label
           >
         </div>
       </div>
@@ -271,7 +258,6 @@ async function openBuy() {
         >
           {{ loading ? 'Rendering…' : 'Render this area' }}
         </Button>
-        <!-- Download is hidden until user management is in place.
         <div class="inline-flex">
           <Button
             :disabled="!result"
@@ -351,26 +337,7 @@ async function openBuy() {
             </PopoverContent>
           </Popover>
         </div>
-        -->
       </div>
-      <!--
-      <Button
-        v-if="result"
-        variant="default"
-        class="w-full"
-        @click="openBuy"
-      >
-        <ShoppingBag :size="14" />
-        Buy prints & merch
-        <span v-if="cartCount" class="ml-0.5 rounded-full bg-brand-foreground/25 px-1.5 py-0.5 text-[10px] tabular-nums">{{ cartCount }}</span>
-      </Button> -->
     </CardContent>
   </Card>
-
-  <BuyPanel
-    v-model:open="buyOpen"
-    :poster-image="posterImage"
-    :title="title"
-    :subtitle="subtitle"
-  />
 </template>

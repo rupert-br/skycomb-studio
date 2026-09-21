@@ -1,15 +1,15 @@
 # Skycomb Studio — concept
 
-Turn any mountain area on a map into an "Unknown Pleasures"-style ridgeline poster: frame an area, the server samples its terrain into stacked elevation profiles, the browser draws and styles them, and the result can be exported for print.
+Turn any mountain area on a map into an "Unknown Pleasures"-style ridgeline drawing: frame an area, the server samples its terrain into stacked elevation profiles, the browser draws and styles them, and the result can be exported as an image.
 
 This folder is a single Nuxt 4 application — Vue 3 + TypeScript on the client, Nitro (Nuxt's own server engine) on the server. There is no separate backend service: the elevation-tile fetching, terrain math and OSM lookups that used to live in a Python/FastAPI service now run as Nitro server routes in the same codebase, same language, same deploy.
 
 ```
 ./
 ├── pages/            index.vue (landing, SSR) · about.vue (SSR) · studio/index.vue (the tool, client-rendered)
-├── components/       map/MapFrame.vue · search/MountainPicker.vue · poster/{PosterPanel,RidgelineChart,BuyPanel}.vue · ui/ (shadcn-vue)
-├── composables/      useRidgelineRender · usePosterTitle · usePosterCard · useChartSize · useRidgelineApi · useCart
-├── data/             mountains.ts (predefined peaks) · products.ts (buy-flow catalog) · heroRidgeline.ts (landing hero, baked real terrain)
+├── components/       map/MapFrame.vue · search/MountainPicker.vue · poster/{PosterPanel,RidgelineChart}.vue · ui/ (shadcn-vue)
+├── composables/      useRidgelineRender · usePosterTitle · usePosterCard · useChartSize · useRidgelineApi
+├── data/             mountains.ts (predefined peaks) · heroRidgeline.ts (landing hero, baked real terrain)
 ├── server/api/       ridgelines.get.ts · summits.get.ts · search-peaks.get.ts · health.get.ts
 ├── server/utils/     dem.ts (terrain math) · peaks.ts (Overpass/Nominatim) · sharedCache.ts · terrarium.ts (PNG decode)
 └── types/            ridgeline.ts — shared, byte-for-byte, between the client and the server
@@ -17,10 +17,10 @@ This folder is a single Nuxt 4 application — Vue 3 + TypeScript on the client,
 
 ## User flow
 
-1. **Frame** — the map opens as a 3D globe on Mapbox's **Standard** style (`projection: "globe"`, night light preset — the dark, hillshaded "outdoors" look) with real terrain displacement; pan/zoom/rotate to find an area, then a fixed 5:4 frame marks the poster area (presets fly there directly). Camera pitch is locked to 0 so the frame always maps to a true rectangle on the ground; the terrain's 3D relief still reads clearly away from the globe's center, purely from the sphere's own curvature. At the zoom levels used to frame a mountain range the curvature is imperceptible, so framing feels like a flat map even though the projection never switches.
+1. **Frame** — the map opens as a 3D globe on Mapbox's **Standard** style (`projection: "globe"`, night light preset — the dark, hillshaded "outdoors" look) with real terrain displacement; pan/zoom/rotate to find an area, then a fixed 5:4 frame marks the area (presets fly there directly). Camera pitch is locked to 0 so the frame always maps to a true rectangle on the ground; the terrain's 3D relief still reads clearly away from the globe's center, purely from the sphere's own curvature. At the zoom levels used to frame a mountain range the curvature is imperceptible, so framing feels like a flat map even though the projection never switches.
 2. **Render** — the frame goes to two endpoints in parallel: ridgelines (drawn as soon as they arrive) and summit names (labels appear when the slower OpenStreetMap lookup finishes).
 3. **Tune** — viewing direction and line count re-query ridgelines only (the elevation grid is cached, so this takes milliseconds); relief, labels and title are pure client-side re-styling.
-4. **Export** — download a poster JPEG (chart + title block, built as SVG then rasterized client-side at 3x for print), or open "Buy prints & merch" for a mocked-up product picker (poster/t-shirt/hoodie/tote/mug, with the rendered poster composited onto each) and a session cart. This is a UI-only preview of the shopping flow — no payment or fulfilment provider is wired up yet (see the v2 roadmap below).
+4. **Export** — download a JPEG (chart + title block, built as SVG then rasterized client-side at 3x).
 
 ## Architecture
 
@@ -99,9 +99,9 @@ Errors (both endpoints): `422` invalid, too large or too small area; `502` eleva
 - One `areaY` (black fill) + `lineY` (white stroke) pair **per row, far → near**. Order matters: Plot groups marks by type when faceting, which breaks occlusion, so the prototype deliberately avoids facets.
 - y is expressed in "line units" (row r sits on baseline −r) so relief is independent of the elevation range; peak height is kept constant in pixels when the line count changes.
 - Space for labels is reserved up front so the chart doesn't jump when summits arrive; labels sit on top of all ridges.
-- Export renders the chart and a title block as SVG, then rasterizes that to a canvas at 3x scale and saves it as a JPEG — vector text stays crisp up to that scale, and JPEG travels better than SVG for print/sharing services that expect a raster image.
+- Export renders the chart and a title block as SVG, then rasterizes that to a canvas at 3x scale and saves it as a JPEG — vector text stays crisp up to that scale, and JPEG travels better than SVG for services that expect a raster image.
 
-## Scaling to a product
+## Scaling up
 
 | Concern | Prototype | Production |
 |---|---|---|
@@ -112,11 +112,11 @@ Errors (both endpoints): `422` invalid, too large or too small area; `502` eleva
 | Base map | OSM standard tiles | commercial tile provider (the OSM tile policy forbids heavy use) |
 | Abuse | span limits | rate limiting per IP/account, request timeouts |
 
-Heavier artefacts (print PDFs, plotter files) should be generated asynchronously: `POST /api/exports` → job queue → file in object storage → download link.
+Heavier artefacts (PDFs, plotter files) should be generated asynchronously: `POST /api/exports` → job queue → file in object storage → download link.
 
 ## Accounts (concept — not implemented)
 
-`/signup` today is a UI-only mock: the fields live in the page's own `ref()`s, submit just sleeps 600 ms and flips to a success state, and nothing is sent to the server — a reload loses it, same spirit as `BuyPanel`'s checkout preview. This is the design for when it becomes real.
+`/signup` today is a UI-only mock: the fields live in the page's own `ref()`s, submit just sleeps 600 ms and flips to a success state, and nothing is sent to the server — a reload loses it. This is the design for when it becomes real.
 
 **Shape: Nitro as a BFF over a private account service.** The Nuxt server stays the only thing the browser ever talks to (a backend-for-frontend); user records live in **PocketBase**, a single off-the-shelf Go binary with SQLite, built-in signup/login, password hashing and an admin UI. PocketBase is not custom code — it's a stateful dependency, like Postgres would be — and it is never exposed to the internet.
 
@@ -134,7 +134,7 @@ flowchart LR
 ```
 
 **Why this shape:**
-- **The browser never sees PocketBase.** No PocketBase URL, SDK or token in client code; CORS and PocketBase's own public API rules stay closed. The BFF is also the place for rate limiting, `zod` validation (already used server-side for `ridgelines`/`search-peaks`) and any later fan-out to other services (print-on-demand, payments).
+- **The browser never sees PocketBase.** No PocketBase URL, SDK or token in client code; CORS and PocketBase's own public API rules stay closed. The BFF is also the place for rate limiting, `zod` validation (already used server-side for `ridgelines`/`search-peaks`) and any later fan-out to other services.
 - **Nitro stays stateless.** All state lives in the one dedicated service, so the app can still autoscale as this doc's scaling table assumes — which a SQLite file inside the app instances could not. The earlier "plain SQLite doesn't survive multiple instances" problem disappears because SQLite is now owned by exactly one process.
 - **Almost no auth code to write.** PocketBase creates users, enforces unique emails and hashes passwords; the BFF is thin glue.
 
@@ -157,27 +157,25 @@ flowchart LR
 
 ## Data and licensing
 
-- **Elevation:** AWS Terrain Tiles aggregate SRTM, Copernicus/EU-DEM, national datasets and others; commercial use is allowed with source attribution (see the dataset's attribution list). For premium Alpine prints, national open DEMs (e.g. Austria's 10 m model on data.gv.at, CC BY 4.0) give sharper ridges; verify licence terms per country.
-- **Summit names:** OpenStreetMap, ODbL. Credit "© OpenStreetMap contributors" on the poster or product page.
-- **Design:** the ridgeline style is not protectable, but "Joy Division", "Unknown Pleasures" and the original cover artwork are, so don't use them in product naming or marketing.
-- **Interactive basemap:** the framing map runs on Mapbox GL JS and the hosted **Standard** style — a proprietary, token-gated service (Mapbox's own terms, not open data), separate from the ridgeline pipeline itself. The backend's elevation sampling and summit names are unaffected and stay on the open AWS Terrain Tiles / OSM Overpass stack described above; only the browser's selection map depends on Mapbox. A generous free tier covers prototype use, but a real product needs a Mapbox account, a scoped production token, and a look at their pricing before launch.
+- **Elevation:** AWS Terrain Tiles aggregate SRTM, Copernicus/EU-DEM, national datasets and others; commercial use is allowed with source attribution (see the dataset's attribution list). For sharper Alpine ridges, national open DEMs (e.g. Austria's 10 m model on data.gv.at, CC BY 4.0) are an option; verify licence terms per country.
+- **Summit names:** OpenStreetMap, ODbL. Credit "© OpenStreetMap contributors" on the artwork or wherever it is shown.
+- **Design:** the ridgeline style is not protectable, but "Joy Division", "Unknown Pleasures" and the original cover artwork are, so don't use them in naming or marketing.
+- **Interactive basemap:** the framing map runs on Mapbox GL JS and the hosted **Standard** style — a proprietary, token-gated service (Mapbox's own terms, not open data), separate from the ridgeline pipeline itself. The backend's elevation sampling and summit names are unaffected and stay on the open AWS Terrain Tiles / OSM Overpass stack described above; only the browser's selection map depends on Mapbox. A generous free tier covers prototype use, but a production deployment needs a Mapbox account, a scoped production token, and a look at their pricing before launch.
 
 ## Roadmap
 
 **MVP (this prototype)** — map framing, presets, direction/lines/relief/labels, JPG export.
 
-**v1 — shareable & printable**
+**v1 — shareable**
 - Place search (geocoding) and shareable URLs (bbox + settings in the query string)
-- Poster formats (A3/A2/50×70, portrait/landscape) driving the frame aspect ratio
-- Print-ready export: server-side PDF (e.g. CairoSVG) with bleed and embedded fonts
+- Formats (portrait/landscape, several sizes) driving the frame aspect ratio
+- PDF export: server-side (e.g. CairoSVG) with embedded fonts
 - GPX upload: highlight a hiked route or race course across the ridgelines
 - Custom text: title, subtitle, date, coordinates
 
-**v2 — commerce & materials**
-- A product picker with mocked-up previews and a session cart exists (`BuyPanel.vue`); still needed: real checkout + print-on-demand fulfilment API behind it
+**v2 — accounts & plotting**
 - Accounts and saved designs
 - **Plotter/laser export:** fills don't exist on a pen plotter, so hidden segments must be removed geometrically (clip each line against the union of nearer ridges, e.g. with Shapely) and paths optimised for travel
-- B2B: bulk/branded editions for huts, tourism regions and races
 
 ## Running the app
 
@@ -192,7 +190,7 @@ npm run dev          # → http://localhost:3000
 ## Known limitations
 
 - No antimeridian handling; latitude limited to ±85°.
-- Summit names depend on the public Overpass API, which often answers HTTP 504 once and then succeeds; the backend retries busy responses (429/5xx) once, and if it still fails the poster renders without labels, shows a note, and the next render tries again.
+- Summit names depend on the public Overpass API, which often answers HTTP 504 once and then succeeds; the backend retries busy responses (429/5xx) once, and if it still fails the drawing renders without labels, shows a note, and the next render tries again.
 - The first render of a never-seen area waits for tile downloads; repeated or nearby frames hit the caches.
 - Caches live in one process, so they are lost on restart and not shared between workers.
 - Very flat areas produce near-flat lines (relief is normalised to the frame's own elevation range).

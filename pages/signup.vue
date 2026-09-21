@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Signup — UI-only preview, same spirit as BuyPanel's mocked checkout: no account is
-// actually created or persisted (there's no backend for that yet, see CONCEPT.md's
-// v2 roadmap). Submitting just simulates a request and shows a success state.
+// Signup — UI-only preview: no account is actually created or persisted (there's no
+// backend for that yet, see CONCEPT.md's roadmap). Submitting just simulates a request
+// and shows a success state.
 import { CheckCircle2 } from '@lucide/vue'
 
 useHead({ title: 'Sign up: Skycomb Studio' })

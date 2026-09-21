@@ -13,7 +13,7 @@ import type {
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const FONT = 'Helvetica Neue, Helvetica, Arial, sans-serif'
-const EXPORT_SCALE = 3 // rasterize at 3x the on-screen size for a decent print resolution
+const EXPORT_SCALE = 3 // rasterize at 3x the on-screen size for a decent export resolution
 const JPEG_QUALITY = 0.92
 
 // Frame fractions (down from north, across from west) → fractions in the viewer's orientation
@@ -246,7 +246,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('Failed to rasterize the poster'))
+    img.onerror = () => reject(new Error('Failed to rasterize the image'))
     img.src = src
   })
 }
@@ -265,9 +265,8 @@ function triggerDownload(url: string, filename: string) {
   }).click()
 }
 
-// Builds the poster SVG (chart + title block) from the currently-drawn chart. Shared by
-// download() (which rasterizes it at export resolution, or hands back the SVG as-is) and
-// getPosterImage() (a lower-res PNG snapshot for the buy-flow mockups).
+// Builds the export SVG (chart + title block) from the currently-drawn chart. Used by
+// download(), which rasterizes it at export resolution or hands back the SVG as-is.
 function buildPosterSvg(
   container: HTMLDivElement | null,
   title: string,
@@ -351,23 +350,6 @@ async function rasterizePoster(svgMarkup: string, W: number, H: number, scale: n
   }
 }
 
-// A PNG snapshot of the current poster (chart + title block) for the buy-flow product
-// mockups — same imagery as a download, just rasterized small and returned as a data URL
-// instead of saved to disk.
-async function getPosterImage(
-  container: HTMLDivElement | null,
-  title: string,
-  subtitle: string,
-  colorScheme: PosterColorScheme,
-  showText: boolean,
-  transparentBackground: boolean,
-): Promise<string | null> {
-  const built = buildPosterSvg(container, title, subtitle, colorScheme, showText, transparentBackground)
-  if (!built) return null
-  const canvas = await rasterizePoster(built.svgMarkup, built.W, built.H, 2)
-  return canvas?.toDataURL('image/png') ?? null
-}
-
 // Poster = chart + title block, built as SVG then, for jpg/png, rasterized. JPEG has no alpha
 // channel, so a transparent background is only honored for svg/png — jpg always falls back to
 // a solid fill in the chosen color scheme rather than silently turning "transparent" black.
@@ -431,7 +413,7 @@ async function download(
     triggerDownload(rasterUrl, `${slug}.${format}`)
     setTimeout(() => URL.revokeObjectURL(rasterUrl), 1000)
   } catch (e) {
-    console.error('Poster export failed:', e)
+    console.error('Export failed:', e)
   } finally {
     URL.revokeObjectURL(svgUrl)
   }
@@ -483,8 +465,6 @@ watchEffect(() => {
 defineExpose({
   download: (title: string, subtitle: string, format: ExportFormat) =>
     void download(containerEl.value, title, subtitle, format, props.colorScheme, props.showText, props.transparentBackground),
-  getPosterImage: (title: string, subtitle: string) =>
-    getPosterImage(containerEl.value, title, subtitle, props.colorScheme, props.showText, props.transparentBackground),
 })
 </script>
 

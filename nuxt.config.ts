@@ -33,6 +33,14 @@ export default defineNuxtConfig({
         },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
       ],
+      // Umami analytics (self-hosted)
+      script: [
+        {
+          src: 'https://umami.rbd-solutions.com/script.js',
+          defer: true,
+          'data-website-id': '0dc64b0d-d348-4494-9605-438e8c4d006a',
+        },
+      ],
     },
   },
 
@@ -42,7 +50,7 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
   },
 
-  // The poster tool (/studio) is a full-viewport interactive map + chart — nothing
+  // The studio (/studio) is a full-viewport interactive map + chart — nothing
   // there benefits from server rendering, and Mapbox GL touches `window` at import
   // time, which is a well-known SSR footgun. The landing page and About stay SSR'd
   // (the app-wide default) for fast first paint and real meta tags once they exist.

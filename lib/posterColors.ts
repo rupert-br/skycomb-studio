@@ -1,6 +1,6 @@
-// Color presets for the downloadable poster (background, ridge lines/labels, and the
-// title/subtitle caption). The on-screen panel, the exported SVG/PNG/JPG, and the buy-flow
-// product mockups all read from the same scheme, so what you preview is what gets printed.
+// Color presets for the artwork (background, ridge lines/labels, and the title/subtitle
+// caption). The on-screen panel and the exported SVG/PNG/JPG read from the same scheme,
+// so what you preview is what you export.
 export interface PosterColorScheme {
   id: string
   name: string

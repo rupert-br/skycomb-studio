@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// A static stand-in for the studio's poster: the same baked Großglockner terrain as the hero,
+// A static stand-in for the studio's artwork: the same baked Großglockner terrain as the hero,
 // re-inked with the studio's own color schemes (lib/posterColors.ts) so the swatches here are
 // exactly the ones the studio offers.
 import { HERO_RIDGELINE } from '~/data/heroRidgeline'
@@ -21,13 +21,12 @@ const subtitle = `${degrees((south + north) / 2, 'N', 'S')} · ${degrees((west +
       </h2>
       <p class="mt-4 text-sm text-muted-foreground sm:text-base">
         The lines are always real terrain. What they're drawn on is up to you:
-        pick a palette and the poster, the download and every product preview
-        follow it.
+        pick a palette and the whole drawing follows it.
       </p>
 
       <div
         role="radiogroup"
-        aria-label="Poster color scheme"
+        aria-label="Color scheme"
         class="mt-8 flex flex-wrap gap-3"
       >
         <button
@@ -56,7 +55,7 @@ const subtitle = `${degrees((south + north) / 2, 'N', 'S')} · ${degrees((west +
       </div>
     </div>
 
-    <!-- The poster: A-series ratio, like the studio's own .poster card -->
+    <!-- The artwork: A-series ratio, like the studio's own .poster card -->
     <div
       class="mx-auto flex aspect-[0.70711] w-full max-w-[21rem] flex-col p-[7%] shadow-elevation-2 transition-colors duration-300 sm:max-w-sm"
       :style="{ backgroundColor: scheme.background }"
