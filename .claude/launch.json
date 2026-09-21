@@ -11,7 +11,7 @@
     {
       "name": "skycomb",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/rupertbrandstatter/projects/skycomb-studio/app", "run", "dev"],
+      "runtimeArgs": ["--prefix", "/Users/rupertbrandstatter/projects/skycomb-studio", "run", "dev"],
       "port": 3000,
       "autoPort": true
     }
